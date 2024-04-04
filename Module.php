@@ -9,6 +9,8 @@ namespace Aurora\Modules\MailCustomImapFolderPrefixPlugin;
 
 use Aurora\Api;
 use Aurora\Modules\Mail\Enums\FolderType;
+use Aurora\System\Enums\UserRole;
+use Aurora\Modules\Mail\Module as MailModule;
 
 /**
  * @license https://www.gnu.org/licenses/agpl-3.0.html AGPL-3.0
@@ -217,6 +219,58 @@ class Module extends \Aurora\System\Module\AbstractModule
                 $mResult->FolderName = $newFolderName;
             }
         }
+    }
+
+    /**
+     * Retursn account settings related to the module.
+     *
+     * @param int $AccountId
+     *
+     * @return array
+     */
+    public function GetAccountSettings($AccountId)
+    {
+        Api::checkUserRoleIsAtLeast(UserRole::NormalUser);
+
+        $oUser = Api::getAuthenticatedUser();
+        if ($oUser) {
+            $oAccount = MailModule::Decorator()->GetAccount($AccountId);
+
+            if ($oAccount) {
+                return [
+                    'Prefix' => trim($oAccount->getExtendedProp(self::GetName() . '::Prefix', '')),
+                ];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Update for account settings related to the module.
+     *
+     * @param int $AccountId
+     * @param string $Prefix
+     *
+     * @return bool
+     */
+    public function UpdateAccountSettings($AccountId, $Prefix)
+    {
+        $result = false;
+
+        Api::checkUserRoleIsAtLeast(UserRole::NormalUser);
+
+        $oUser = Api::getAuthenticatedUser();
+        if ($oUser) {
+            $oAccount = MailModule::Decorator()->GetAccount($AccountId);
+
+            if ($oAccount) {
+                $oAccount->setExtendedProp(self::GetName() . '::Prefix', trim((string) $Prefix));
+                $result = $oAccount->save();
+            }
+        }
+
+        return $result;
     }
     /***** private functions *****/
 }
