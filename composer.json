@@ -1,0 +1,14 @@
+{
+	"name": "afterlogic/aurora-module-mail-custom-imap-folder-plugin",
+	"type": "aurora-module",
+	"require":{
+		"php":">=7.4.0",
+		"afterlogic/aurora-framework": "~0.10.86"
+	},
+	"autoload": {
+		"classmap": ["/"]
+	},
+	"extra": {
+		"installer-name": "MailCustomImapFolderPrefixPlugin"
+	}
+}
