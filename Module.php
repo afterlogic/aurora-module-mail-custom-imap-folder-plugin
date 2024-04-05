@@ -17,14 +17,13 @@ use Aurora\Modules\Mail\Module as MailModule;
  * @license https://afterlogic.com/products/common-licensing Afterlogic Software License
  * @copyright Copyright (c) 2023, Afterlogic Corp.
  *
- * @property Settings $oModuleSettings
- *
  * @package Modules
  */
 class Module extends \Aurora\System\Module\AbstractModule
 {
-    public static $prefix = 'Mail';
     public static $delimiter = '/';
+
+    protected $aRequireModules = ['Mail'];
 
     /**
      * Initializes Mail Module.
@@ -63,6 +62,8 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::GetRelevantFoldersInformation::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::UpdateFoldersOrder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SaveMessageAsTempFile::before', [$this, 'prepareArguments']);
+
+        $this->subscribeEvent('System::RunEntry::before', [$this, 'onBeforeRunEntry']);
     }
 
     /**
@@ -81,14 +82,13 @@ class Module extends \Aurora\System\Module\AbstractModule
         return parent::Decorator();
     }
 
-    protected function renameSubfoldersRec(&$folder)
+    protected function renameSubfoldersRec($folder, $prefix, &$renamedFolders) 
     {
-        $prefix = self::$prefix . $folder->getDelimiter();
         $subfoldersColl = $folder->getSubFolders();
         if ($subfoldersColl !== null) {
-            $subfolders = & $subfoldersColl->GetAsArray();
+            $subfolders =& $subfoldersColl->GetAsArray();
             foreach ($subfolders as $subFolder) {
-                $this->renameSubfoldersRec($subFolder);
+                $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
             }
         }
         if (substr($folder->getFullName(), 0, strlen($prefix)) == $prefix) {
@@ -101,82 +101,122 @@ class Module extends \Aurora\System\Module\AbstractModule
             $oImapFolderProp = $refImapFolder->getProperty('sFullNameRaw');
             $oImapFolderProp->setAccessible(true);
             $oImapFolderProp->setValue($oImapFolder, substr($oImapFolder->FullNameRaw(), strlen($prefix)));
+
+            $renamedFolders[] = $folder;
         }
     }
 
     public function onAfterGetFolders($aArgs, &$mResult)
     {
         if (is_array($mResult) && isset($mResult['Folders']) && is_object($mResult['Folders'])) {
-            $folders = & $mResult['Folders']->GetAsArray();
-            $subFolders = [];
+            $prefix = '';
+            if (isset($aArgs['AccountID'])) {
+                $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']) . self::$delimiter;
+            }
+
+            $folders =& $mResult['Folders']->GetAsArray();
+            $renamedFolders = [];
             foreach ($folders as $key => $folder) {
                 if ($folder->getType() !== FolderType::Inbox) {
-                    if ($folder->getRawFullName() === self::$prefix) {
-                        $subFolders = & $folder->getSubFolders()->GetAsArray();
+                    $subFoldersColl = $folder->getSubFolders();
+                    if ($subFoldersColl) {
+                        $subFolders = $subFoldersColl->GetAsArray();
                         foreach ($subFolders as $subFolder) {
-                            $this->renameSubfoldersRec($subFolder);
+                            $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
                         }
                     }
                     unset($folders[$key]);
                 }
             }
-            $folders = array_merge($folders, $subFolders);
+            $folders = array_merge($folders, $renamedFolders);
             $folders = array_values($folders);
-
-            /** @var \Aurora\Modules\Mail\Module */
+            
             $oMailModule = Api::GetModule('Mail');
-            if ($oMailModule) {
+            if ($oMailModule instanceof MailModule ) {
                 $manager = $oMailModule->getMailManager();
                 $oAccount = $oMailModule->getAccountsManager()->getAccountById($aArgs['AccountID']);
                 \Closure::bind(
-                    fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false),
-                    null,
-                    get_class($manager)
+                    fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false), null, get_class($manager)
                 )($manager);
             }
         }
     }
 
-    protected function prepareFolderName($folder)
+    protected function addPrefixToFolderName($folder, $prefix)
     {
-        if ($folder !== 'INBOX' && substr($folder, 0, strlen('INBOX/')) !== 'INBOX/') {
-            $folder = self::$prefix . '/' . $folder;
+        if ($folder !== 'INBOX' && substr($folder, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
+            if (!empty($folder)) {
+                if (!empty($prefix)) {
+                    $folder = $prefix . self::$delimiter . $folder;
+                }
+            } else {
+                $folder = $prefix;
+            }
         }
 
         return $folder;
     }
 
+    protected function removePrefixFromFolderName($folder, $prefix)
+    {
+        $prefix = $prefix . self::$delimiter;
+        if (substr($folder, 0, strlen($prefix)) === $prefix) {
+            $folder = substr($folder, strlen($prefix));
+        }
+
+        return $folder;
+    }
+
+    protected function getPrefixForAccount($AccountId)
+    {
+        $prefix = '';
+        $oUser = Api::getAuthenticatedUser();
+        if ($oUser) {
+            $oAccount = MailModule::Decorator()->GetAccount($AccountId);
+            if ($oAccount && $oAccount->IdUser === $oUser->Id) {
+                $prefix = trim($oAccount->getExtendedProp(self::GetName() . '::Prefix', ''));
+            }
+        }
+
+        return $prefix;
+    }
+
     public function prepareArguments(&$aArgs, &$mResult)
     {
+        $prefix = '';
+        if (isset($aArgs['AccountID'])) {
+            $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
+        }
+
         if (isset($aArgs['Folder'])) {
-            $aArgs['Folder'] = $this->prepareFolderName($aArgs['Folder']);
+            $aArgs['Folder'] = $this->addPrefixToFolderName($aArgs['Folder'], $prefix);
         }
 
         if (isset($aArgs['ToFolder'])) {
-            $aArgs['ToFolder'] = $this->prepareFolderName($aArgs['ToFolder']);
+            $aArgs['ToFolder'] = $this->addPrefixToFolderName($aArgs['ToFolder'], $prefix);
         }
 
         if (isset($aArgs['FolderParentFullNameRaw'])) {
-            $aArgs['FolderParentFullNameRaw'] = $this->prepareFolderName($aArgs['FolderParentFullNameRaw']);
+            $aArgs['FolderParentFullNameRaw'] = $this->addPrefixToFolderName($aArgs['FolderParentFullNameRaw'], $prefix);
         }
 
         if (isset($aArgs['MessageFolder'])) {
-            $aArgs['MessageFolder'] = $this->prepareFolderName($aArgs['MessageFolder']);
+            $aArgs['MessageFolder'] = $this->addPrefixToFolderName($aArgs['MessageFolder'], $prefix);
         }
 
         if (isset($aArgs['FolderFullName'])) {
-            $aArgs['FolderFullName'] = $this->prepareFolderName($aArgs['FolderFullName']);
+            $aArgs['FolderFullName'] = $this->addPrefixToFolderName($aArgs['FolderFullName'], $prefix);
         }
 
         if (isset($aArgs['Folders']) && is_array($aArgs['Folders'])) {
             foreach ($aArgs['Folders'] as $val) {
-                $val = $this->prepareFolderName($val);
+                $val = $this->addPrefixToFolderName($val, $prefix);
             }
         }
 
         if (isset($aArgs['FolderList']) && is_array($aArgs['FolderList'])) {
             foreach ($aArgs['FolderList'] as $val) {
-                $val = $this->prepareFolderName($val);
+                $val = $this->addPrefixToFolderName($val, $prefix);
             }
         }
     }
@@ -184,13 +224,16 @@ class Module extends \Aurora\System\Module\AbstractModule
     public function onAfterGetRelevantFoldersInformation(&$aArgs, &$mResult)
     {
         if ($mResult && isset($mResult['Counts'])) {
-            $prefix = self::$prefix . '/';
+            $prefix = '';
+            if (isset($aArgs['AccountID'])) {
+                $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
+            }
             $foldersInfo = [];
             foreach ($mResult['Counts'] as $key => $val) {
-                if ($key !== 'INBOX' && substr($key, 0, strlen('INBOX/')) !== 'INBOX/') {
+                if ($key !== 'INBOX' && substr($key, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
                     unset($mResult['Counts'][$key]);
-                    if (substr($key, 0, strlen($prefix)) === $prefix) {
-                        $key = substr($key, strlen($prefix));
+                    $newKey = $this->removePrefixFromFolderName($key, $prefix);
+                    if ($newKey !== $key) {
                         $foldersInfo[$key] = $val;
                     }
                 }
@@ -202,26 +245,47 @@ class Module extends \Aurora\System\Module\AbstractModule
     public function onAfterGetMessages(&$aArgs, &$mResult)
     {
         if ($mResult) {
-            $prefix = self::$prefix . '/';
-            $massages = & $mResult->GetAsArray();
+            $prefix = '';
+            if (isset($aArgs['AccountID'])) {
+                $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
+            }
+            $massages =& $mResult->GetAsArray();
             foreach ($massages as $message) {
                 $refMessage = new \ReflectionObject($message);
                 $folderProp = $refMessage->getProperty('sFolder');
                 $folderProp->setAccessible(true);
-
-                if (substr($message->getFolder(), 0, strlen($prefix)) === $prefix) {
-                    $newFolderName = substr($message->getFolder(), strlen($prefix));
-                    $folderProp->setValue($message, $newFolderName);
-                }
+                $newFolderName = $this->removePrefixFromFolderName($message->getFolder(), $prefix);
+                $folderProp->setValue($message, $newFolderName);
             };
-            if (substr($mResult->FolderName, 0, strlen($prefix)) === $prefix) {
-                $newFolderName = substr($mResult->FolderName, strlen($prefix));
-                $mResult->FolderName = $newFolderName;
-            }
+            $mResult->FolderName = $this->removePrefixFromFolderName($mResult->FolderName, $prefix);
         }
     }
 
-    /**
+    public function onBeforeRunEntry($aArgs, &$mResult)
+    {
+        $aEntries = ['mail-attachment', 'mail-attachments-cookieless'];
+        if (isset($aArgs['EntryName']) && in_array(strtolower($aArgs['EntryName']), $aEntries)) {
+            $queryString = $_SERVER['QUERY_STRING'];
+            $queryStringList = \explode('/', $queryString);
+            if (isset($queryStringList[1])) {
+                $sHash = (string) $queryStringList[1];
+                $aValues = \Aurora\System\Api::DecodeKeyValues($sHash);
+                if (isset($aValues['Folder'])) {
+                    $prefix = '';
+                    if (isset($aArgs['AccountID'])) {
+                        $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
+                    }
+                    $aValues['Folder'] = $this->removePrefixFromFolderName($aValues['Folder'], $prefix);
+                    $queryStringList[1] = \Aurora\System\Api::EncodeKeyValues($aValues);
+                    $_SERVER['QUERY_STRING'] = implode('/', $queryStringList);
+                }
+            }
+
+        }
+    }
+    /***** private functions *****/
+
+        /**
      * Retursn account settings related to the module.
      *
      * @param int $AccountId
@@ -272,5 +336,4 @@ class Module extends \Aurora\System\Module\AbstractModule
 
         return $result;
     }
-    /***** private functions *****/
 }
