@@ -82,11 +82,11 @@ class Module extends \Aurora\System\Module\AbstractModule
         return parent::Decorator();
     }
 
-    protected function renameSubfoldersRec($folder, $prefix, &$renamedFolders) 
+    protected function renameSubfoldersRec($folder, $prefix, &$renamedFolders)
     {
         $subfoldersColl = $folder->getSubFolders();
         if ($subfoldersColl !== null) {
-            $subfolders =& $subfoldersColl->GetAsArray();
+            $subfolders = & $subfoldersColl->GetAsArray();
             foreach ($subfolders as $subFolder) {
                 $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
             }
@@ -114,7 +114,7 @@ class Module extends \Aurora\System\Module\AbstractModule
                 $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']) . self::$delimiter;
             }
 
-            $folders =& $mResult['Folders']->GetAsArray();
+            $folders = & $mResult['Folders']->GetAsArray();
             $renamedFolders = [];
             foreach ($folders as $key => $folder) {
                 if ($folder->getType() !== FolderType::Inbox) {
@@ -130,13 +130,15 @@ class Module extends \Aurora\System\Module\AbstractModule
             }
             $folders = array_merge($folders, $renamedFolders);
             $folders = array_values($folders);
-            
+
             $oMailModule = Api::GetModule('Mail');
-            if ($oMailModule instanceof MailModule ) {
+            if ($oMailModule instanceof MailModule) {
                 $manager = $oMailModule->getMailManager();
                 $oAccount = $oMailModule->getAccountsManager()->getAccountById($aArgs['AccountID']);
                 \Closure::bind(
-                    fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false), null, get_class($manager)
+                    fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false),
+                    null,
+                    get_class($manager)
                 )($manager);
             }
         }
@@ -249,7 +251,7 @@ class Module extends \Aurora\System\Module\AbstractModule
             if (isset($aArgs['AccountID'])) {
                 $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
             }
-            $massages =& $mResult->GetAsArray();
+            $massages = & $mResult->GetAsArray();
             foreach ($massages as $message) {
                 $refMessage = new \ReflectionObject($message);
                 $folderProp = $refMessage->getProperty('sFolder');
@@ -285,7 +287,7 @@ class Module extends \Aurora\System\Module\AbstractModule
     }
     /***** private functions *****/
 
-        /**
+    /**
      * Retursn account settings related to the module.
      *
      * @param int $AccountId
