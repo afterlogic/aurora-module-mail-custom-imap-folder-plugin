@@ -63,8 +63,11 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::GetRelevantFoldersInformation::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::UpdateFoldersOrder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SaveMessageAsTempFile::before', [$this, 'prepareArguments']);
+        $this->subscribeEvent('Mail::SetupSystemFolders::before', [$this, 'prepareArguments']);
 
         $this->subscribeEvent('System::RunEntry::before', [$this, 'onBeforeRunEntry']);
+
+        MailModule::getInstance()->setMailManager(new Manager($this));
     }
 
     /**
@@ -85,13 +88,6 @@ class Module extends \Aurora\System\Module\AbstractModule
 
     protected function renameSubfoldersRec($folder, $prefix, &$renamedFolders)
     {
-        $subfoldersColl = $folder->getSubFolders();
-        if ($subfoldersColl !== null) {
-            $subfolders = & $subfoldersColl->GetAsArray();
-            foreach ($subfolders as $subFolder) {
-                $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
-            }
-        }
         if (substr($folder->getFullName(), 0, strlen($prefix)) == $prefix) {
             $refFolder = new \ReflectionObject($folder);
             $oImapFolderProp = $refFolder->getProperty('oImapFolder');
@@ -104,6 +100,14 @@ class Module extends \Aurora\System\Module\AbstractModule
             $oImapFolderProp->setValue($oImapFolder, substr($oImapFolder->FullNameRaw(), strlen($prefix)));
 
             $renamedFolders[] = $folder;
+        } else {    
+            $subfoldersColl = $folder->getSubFolders();
+            if ($subfoldersColl !== null) {
+                $subfolders = & $subfoldersColl->GetAsArray();
+                foreach ($subfolders as $subFolder) {
+                    $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
+                }
+            }
         }
     }
 
@@ -132,16 +136,16 @@ class Module extends \Aurora\System\Module\AbstractModule
             $folders = array_merge($folders, $renamedFolders);
             $folders = array_values($folders);
 
-            $oMailModule = Api::GetModule('Mail');
-            if ($oMailModule instanceof MailModule) {
-                $manager = $oMailModule->getMailManager();
-                $oAccount = $oMailModule->getAccountsManager()->getAccountById($aArgs['AccountID']);
-                \Closure::bind(
-                    fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false),
-                    null,
-                    get_class($manager)
-                )($manager);
-            }
+            // $oMailModule = Api::GetModule('Mail');
+            // if ($oMailModule instanceof MailModule) {
+            //     $manager = $oMailModule->getMailManager();
+            //     $oAccount = $oMailModule->getAccountsManager()->getAccountById($aArgs['AccountID']);
+            //     \Closure::bind(
+            //         fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false),
+            //         null,
+            //         get_class($manager)
+            //     )($manager);
+            // }
         }
     }
 
@@ -213,6 +217,22 @@ class Module extends \Aurora\System\Module\AbstractModule
 
         if (isset($aArgs['FolderFullName'])) {
             $aArgs['FolderFullName'] = $this->addPrefixToFolderName($aArgs['FolderFullName'], $prefix);
+        }
+
+        if (isset($aArgs['Sent'])) {
+            $aArgs['Sent'] = $this->addPrefixToFolderName($aArgs['Sent'], $prefix);
+        }
+
+        if (isset($aArgs['Drafts'])) {
+            $aArgs['Drafts'] = $this->addPrefixToFolderName($aArgs['Drafts'], $prefix);
+        }
+
+        if (isset($aArgs['Trash'])) {
+            $aArgs['Trash'] = $this->addPrefixToFolderName($aArgs['Trash'], $prefix);
+        }
+
+        if (isset($aArgs['Spam'])) {
+            $aArgs['Spam'] = $this->addPrefixToFolderName($aArgs['Spam'], $prefix);
         }
 
         if (isset($aArgs['Folders']) && is_array($aArgs['Folders'])) {
