@@ -52,6 +52,7 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::DeleteMessages::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::CreateFolder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::DeleteFolder::before', [$this, 'prepareArguments']);
+        $this->subscribeEvent('Mail::RenameFolder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SubscribeFolder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::ClearFolder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::GetMessagesByUids::before', [$this, 'prepareArguments']);
@@ -200,6 +201,10 @@ class Module extends \Aurora\System\Module\AbstractModule
 
         if (isset($aArgs['FolderParentFullNameRaw'])) {
             $aArgs['FolderParentFullNameRaw'] = $this->addPrefixToFolderName($aArgs['FolderParentFullNameRaw'], $prefix);
+        }
+
+        if (isset($aArgs['PrevFolderFullNameRaw'])) {
+            $aArgs['PrevFolderFullNameRaw'] = $this->addPrefixToFolderName($aArgs['PrevFolderFullNameRaw'], $prefix);
         }
 
         if (isset($aArgs['MessageFolder'])) {
