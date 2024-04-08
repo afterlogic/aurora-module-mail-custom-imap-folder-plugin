@@ -8,6 +8,7 @@
 namespace Aurora\Modules\MailCustomImapFolderPrefixPlugin;
 
 use Aurora\Modules\Mail\Models\MailAccount;
+use Aurora\Modules\Mail\Models\SystemFolder;
 
 
 /**
@@ -55,6 +56,13 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         }
     }
 
+    private function _getSystemFolderEntities($oAccount)
+    {
+        return SystemFolder::where(array(
+            'IdAccount' => $oAccount->Id
+        ))->limit(9)->get();
+    }
+
     /**
      * Sets system type for existent folders from folders map, excludes information about them from $aFoldersMap.
      *
@@ -72,6 +80,26 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
                             $oFolder->setType($iFolderType);
                         }
                     }
+                }
+            }
+        );
+    }
+
+        /**
+     * Obtains information about system folders from IMAP.
+     * Sets system type for obtained folders, excludes information about them from $aFoldersMap.
+     *
+     * @param \Aurora\Modules\Mail\Classes\FolderCollection $oFolderCollection Collection of folders.
+     * @param array $aFoldersMap Describes information about system folders that weren't initialized yet.
+     */
+    private function _initSystemFoldersFromImapFlags($oFolderCollection, &$aFoldersMap)
+    {
+        $oFolderCollection->foreachWithSubFolders(
+            function (/* @var $oFolder \Aurora\Modules\Mail\Classes\Folder */ $oFolder) use (&$aFoldersMap) {
+                $iXListType = $oFolder->getFolderXListType();
+                if (isset($aFoldersMap[$iXListType]) && \Aurora\Modules\Mail\Enums\FolderType::Custom === $oFolder->getType() && isset($aFoldersMap[$iXListType])) {
+                    unset($aFoldersMap[$iXListType]);
+                    $oFolder->setType($iXListType);
                 }
             }
         );
