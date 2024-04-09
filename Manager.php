@@ -24,6 +24,16 @@ use Aurora\Modules\Mail\Models\SystemFolder;
  */
 class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
 {
+    private function getPrefixForAccount($oAccount)
+    {
+        $prefix = trim($oAccount->getExtendedProp('MailCustomImapFolderPrefixPlugin::Prefix', ''));
+        if (!empty(trim($prefix))) {
+            $prefix = trim($prefix) . Module::$delimiter;
+        }
+
+        return $prefix;
+    }
+
     /**
      * Obtains information about system folders from database.
      * Sets system type for existent folders, excludes information about them from $aFoldersMap.
@@ -69,12 +79,12 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
      * @param \Aurora\Modules\Mail\Classes\FolderCollection $oFolderCollection Collection of folders.
      * @param array $aFoldersMap Describes information about system folders that weren't initialized yet.
      */
-    private function _initSystemFoldersFromFoldersMap($oFolderCollection, &$aFoldersMap)
+    protected function _initSystemFoldersFromFoldersMap($oFolderCollection, &$aFoldersMap)
     {
         $oFolderCollection->foreachOnlyRoot(
             function (/* @var $oFolder \Aurora\Modules\Mail\Classes\Folder */ $oFolder) use (&$aFoldersMap) {
                 foreach ($aFoldersMap as $iFolderType => $aFoldersNames) {
-                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) && (in_array($oFolder->getRawName(), $aFoldersNames) || in_array($oFolder->getName(), $aFoldersNames))) {
+                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) && (in_array($oFolder->getRawFullName(), $aFoldersNames) || in_array($oFolder->getRawFullName(), $aFoldersNames))) {
                         unset($aFoldersMap[$iFolderType]);
                         if (\Aurora\Modules\Mail\Enums\FolderType::Custom === $oFolder->getType()) {
                             $oFolder->setType($iFolderType);
@@ -142,7 +152,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
      *
      * @return bool
      */
-    private function _initSystemFolders($oAccount, &$oFolderCollection, $bCreateNonexistentSystemFolders)
+    protected function _initSystemFolders($oAccount, &$oFolderCollection, $bCreateNonexistentSystemFolders)
     {
         $bSystemFolderIsCreated = false;
 
@@ -167,17 +177,31 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
                 $oInbox->setType(\Aurora\Modules\Mail\Enums\FolderType::Inbox);
             }
 
+            $prefix = $this->getPrefixForAccount($oAccount);
+            $oFolderCollection->foreachWithSubFolders(
+                function ($oFolder) use (&$prefixFolder, $prefix) {
+                    if ($oFolder->getRawFullName() === rtrim($prefix, '/')) {
+                        $prefixFolder = $oFolder;
+                    }
+                }
+            );
+
+            $prefixSubfoldersCollection = $oFolderCollection;
+            if ($prefixFolder) {
+                $prefixSubfoldersCollection = $prefixFolder->getSubFolders();
+            }
+
             // Tries to set system folders from database data.
-            $this->_initSystemFoldersFromDb($oAccount, $oFolderCollection, $aFoldersMap);
+            $this->_initSystemFoldersFromDb($oAccount, $prefixSubfoldersCollection, $aFoldersMap);
 
             // Tries to set system folders from imap flags for those folders that weren't set from database data.
-            $this->_initSystemFoldersFromImapFlags($oFolderCollection, $aFoldersMap);
+            $this->_initSystemFoldersFromImapFlags($prefixSubfoldersCollection, $aFoldersMap);
 
             // Tries to set system folders from folders map for those folders that weren't set from database data or IMAP flags.
-            $this->_initSystemFoldersFromFoldersMap($oFolderCollection, $aFoldersMap);
+            $this->_initSystemFoldersFromFoldersMap($prefixSubfoldersCollection, $aFoldersMap);
 
             if ($bCreateNonexistentSystemFolders) {
-                $bSystemFolderIsCreated = $this->_createNonexistentSystemFolders($oAccount, $oFolderCollection, $aFoldersMap);
+                $bSystemFolderIsCreated = $this->_createNonexistentSystemFolders($oAccount, $prefixSubfoldersCollection, $aFoldersMap);
             }
         } catch (\Exception $oException) {
             $bSystemFolderIsCreated = false;

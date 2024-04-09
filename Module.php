@@ -33,6 +33,7 @@ class Module extends \Aurora\System\Module\AbstractModule
     public function init()
     {
         $this->subscribeEvent('Mail::GetFolders::after', [$this, 'onAfterGetFolders']);
+        $this->subscribeEvent('Mail::GetFolders::before', [$this, 'onBeforeGetFolders']);
         $this->subscribeEvent('Mail::GetRelevantFoldersInformation::after', [$this, 'onAfterGetRelevantFoldersInformation']);
         $this->subscribeEvent('Mail::GetMessages::after', [$this, 'onAfterGetMessages']);
 
@@ -66,8 +67,6 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::SetupSystemFolders::before', [$this, 'prepareArguments']);
 
         $this->subscribeEvent('System::RunEntry::before', [$this, 'onBeforeRunEntry']);
-
-        MailModule::getInstance()->setMailManager(new Manager($this));
     }
 
     /**
@@ -109,6 +108,11 @@ class Module extends \Aurora\System\Module\AbstractModule
                 }
             }
         }
+    }
+
+    public function onBeforeGetFolders($aArgs, &$mResult)
+    {
+        MailModule::getInstance()->setMailManager(new Manager($this));
     }
 
     public function onAfterGetFolders($aArgs, &$mResult)
