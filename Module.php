@@ -123,33 +123,24 @@ class Module extends \Aurora\System\Module\AbstractModule
                 $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']) . self::$delimiter;
             }
 
-            $folders = & $mResult['Folders']->GetAsArray();
-            $renamedFolders = [];
-            foreach ($folders as $key => $folder) {
-                if ($folder->getType() !== FolderType::Inbox) {
-                    $subFoldersColl = $folder->getSubFolders();
-                    if ($subFoldersColl) {
-                        $subFolders = $subFoldersColl->GetAsArray();
-                        foreach ($subFolders as $subFolder) {
-                            $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
+            if (!empty(rtrim($prefix, self::$delimiter))) {
+                $folders = & $mResult['Folders']->GetAsArray();
+                $renamedFolders = [];
+                foreach ($folders as $key => $folder) {
+                    if ($folder->getType() !== FolderType::Inbox) {
+                        $subFoldersColl = $folder->getSubFolders();
+                        if ($subFoldersColl) {
+                            $subFolders = $subFoldersColl->GetAsArray();
+                            foreach ($subFolders as $subFolder) {
+                                $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
+                            }
                         }
+                        unset($folders[$key]);
                     }
-                    unset($folders[$key]);
                 }
+                $folders = array_merge($folders, $renamedFolders);
+                $folders = array_values($folders);
             }
-            $folders = array_merge($folders, $renamedFolders);
-            $folders = array_values($folders);
-
-            // $oMailModule = Api::GetModule('Mail');
-            // if ($oMailModule instanceof MailModule) {
-            //     $manager = $oMailModule->getMailManager();
-            //     $oAccount = $oMailModule->getAccountsManager()->getAccountById($aArgs['AccountID']);
-            //     \Closure::bind(
-            //         fn ($class) => $class->_initSystemFolders($oAccount, $mResult['Folders'], false),
-            //         null,
-            //         get_class($manager)
-            //     )($manager);
-            // }
         }
     }
 
