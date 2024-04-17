@@ -256,7 +256,7 @@ class Module extends \Aurora\System\Module\AbstractModule
                     unset($mResult['Counts'][$key]);
                     $newKey = $this->removePrefixFromFolderName($key, $prefix);
                     if ($newKey !== $key) {
-                        $foldersInfo[$key] = $val;
+                        $foldersInfo[$newKey] = $val;
                     }
                 }
             }
