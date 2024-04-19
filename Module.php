@@ -260,7 +260,7 @@ class Module extends \Aurora\System\Module\AbstractModule
                     }
                 }
             }
-            $mResult['Counts'] = array_merge($mResult['Counts'], $foldersInfo);
+            $mResult['Counts'] = $mResult['Counts'] + $foldersInfo;
         }
     }
 
