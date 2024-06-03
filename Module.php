@@ -146,7 +146,7 @@ class Module extends \Aurora\System\Module\AbstractModule
 
     protected function addPrefixToFolderName($folder, $prefix)
     {
-        if ($folder !== 'INBOX' && substr($folder, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
+        if (!empty($prefix) && $folder !== 'INBOX' && substr($folder, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
             if (!empty($folder)) {
                 if (!empty($prefix)) {
                     $folder = $prefix . self::$delimiter . $folder;
@@ -161,9 +161,11 @@ class Module extends \Aurora\System\Module\AbstractModule
 
     protected function removePrefixFromFolderName($folder, $prefix)
     {
-        $prefix = $prefix . self::$delimiter;
-        if (substr($folder, 0, strlen($prefix)) === $prefix) {
-            $folder = substr($folder, strlen($prefix));
+        if (!empty($prefix)) {
+            $prefix = $prefix . self::$delimiter;
+            if (substr($folder, 0, strlen($prefix)) === $prefix) {
+                $folder = substr($folder, strlen($prefix));
+            }
         }
 
         return $folder;
@@ -189,56 +191,59 @@ class Module extends \Aurora\System\Module\AbstractModule
         if (isset($aArgs['AccountID'])) {
             $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
         }
+        $prefix = trim($prefix);
 
-        if (isset($aArgs['Folder'])) {
-            $aArgs['Folder'] = $this->addPrefixToFolderName($aArgs['Folder'], $prefix);
-        }
-
-        if (isset($aArgs['ToFolder'])) {
-            $aArgs['ToFolder'] = $this->addPrefixToFolderName($aArgs['ToFolder'], $prefix);
-        }
-
-        if (isset($aArgs['FolderParentFullNameRaw'])) {
-            $aArgs['FolderParentFullNameRaw'] = $this->addPrefixToFolderName($aArgs['FolderParentFullNameRaw'], $prefix);
-        }
-
-        if (isset($aArgs['PrevFolderFullNameRaw'])) {
-            $aArgs['PrevFolderFullNameRaw'] = $this->addPrefixToFolderName($aArgs['PrevFolderFullNameRaw'], $prefix);
-        }
-
-        if (isset($aArgs['MessageFolder'])) {
-            $aArgs['MessageFolder'] = $this->addPrefixToFolderName($aArgs['MessageFolder'], $prefix);
-        }
-
-        if (isset($aArgs['FolderFullName'])) {
-            $aArgs['FolderFullName'] = $this->addPrefixToFolderName($aArgs['FolderFullName'], $prefix);
-        }
-
-        if (isset($aArgs['Sent'])) {
-            $aArgs['Sent'] = $this->addPrefixToFolderName($aArgs['Sent'], $prefix);
-        }
-
-        if (isset($aArgs['Drafts'])) {
-            $aArgs['Drafts'] = $this->addPrefixToFolderName($aArgs['Drafts'], $prefix);
-        }
-
-        if (isset($aArgs['Trash'])) {
-            $aArgs['Trash'] = $this->addPrefixToFolderName($aArgs['Trash'], $prefix);
-        }
-
-        if (isset($aArgs['Spam'])) {
-            $aArgs['Spam'] = $this->addPrefixToFolderName($aArgs['Spam'], $prefix);
-        }
-
-        if (isset($aArgs['Folders']) && is_array($aArgs['Folders'])) {
-            foreach ($aArgs['Folders'] as $val) {
-                $val = $this->addPrefixToFolderName($val, $prefix);
+        if (!empty($prefix)) {
+            if (isset($aArgs['Folder'])) {
+                $aArgs['Folder'] = $this->addPrefixToFolderName($aArgs['Folder'], $prefix);
             }
-        }
 
-        if (isset($aArgs['FolderList']) && is_array($aArgs['FolderList'])) {
-            foreach ($aArgs['FolderList'] as $val) {
-                $val = $this->addPrefixToFolderName($val, $prefix);
+            if (isset($aArgs['ToFolder'])) {
+                $aArgs['ToFolder'] = $this->addPrefixToFolderName($aArgs['ToFolder'], $prefix);
+            }
+
+            if (isset($aArgs['FolderParentFullNameRaw'])) {
+                $aArgs['FolderParentFullNameRaw'] = $this->addPrefixToFolderName($aArgs['FolderParentFullNameRaw'], $prefix);
+            }
+
+            if (isset($aArgs['PrevFolderFullNameRaw'])) {
+                $aArgs['PrevFolderFullNameRaw'] = $this->addPrefixToFolderName($aArgs['PrevFolderFullNameRaw'], $prefix);
+            }
+
+            if (isset($aArgs['MessageFolder'])) {
+                $aArgs['MessageFolder'] = $this->addPrefixToFolderName($aArgs['MessageFolder'], $prefix);
+            }
+
+            if (isset($aArgs['FolderFullName'])) {
+                $aArgs['FolderFullName'] = $this->addPrefixToFolderName($aArgs['FolderFullName'], $prefix);
+            }
+
+            if (isset($aArgs['Sent'])) {
+                $aArgs['Sent'] = $this->addPrefixToFolderName($aArgs['Sent'], $prefix);
+            }
+
+            if (isset($aArgs['Drafts'])) {
+                $aArgs['Drafts'] = $this->addPrefixToFolderName($aArgs['Drafts'], $prefix);
+            }
+
+            if (isset($aArgs['Trash'])) {
+                $aArgs['Trash'] = $this->addPrefixToFolderName($aArgs['Trash'], $prefix);
+            }
+
+            if (isset($aArgs['Spam'])) {
+                $aArgs['Spam'] = $this->addPrefixToFolderName($aArgs['Spam'], $prefix);
+            }
+
+            if (isset($aArgs['Folders']) && is_array($aArgs['Folders'])) {
+                foreach ($aArgs['Folders'] as $val) {
+                    $val = $this->addPrefixToFolderName($val, $prefix);
+                }
+            }
+
+            if (isset($aArgs['FolderList']) && is_array($aArgs['FolderList'])) {
+                foreach ($aArgs['FolderList'] as $val) {
+                    $val = $this->addPrefixToFolderName($val, $prefix);
+                }
             }
         }
     }
@@ -250,17 +255,21 @@ class Module extends \Aurora\System\Module\AbstractModule
             if (isset($aArgs['AccountID'])) {
                 $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
             }
-            $foldersInfo = [];
-            foreach ($mResult['Counts'] as $key => $val) {
-                if ($key !== 'INBOX' && substr($key, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
-                    unset($mResult['Counts'][$key]);
-                    $newKey = $this->removePrefixFromFolderName($key, $prefix);
-                    if ($newKey !== $key) {
-                        $foldersInfo[$newKey] = $val;
+
+            $prefix = trim($prefix);
+            if (!empty($prefix)) {
+                $foldersInfo = [];
+                foreach ($mResult['Counts'] as $key => $val) {
+                    if ($key !== 'INBOX' && substr($key, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
+                        unset($mResult['Counts'][$key]);
+                        $newKey = $this->removePrefixFromFolderName($key, $prefix);
+                        if ($newKey !== $key) {
+                            $foldersInfo[$newKey] = $val;
+                        }
                     }
                 }
+                $mResult['Counts'] = $mResult['Counts'] + $foldersInfo;
             }
-            $mResult['Counts'] = $mResult['Counts'] + $foldersInfo;
         }
     }
 
