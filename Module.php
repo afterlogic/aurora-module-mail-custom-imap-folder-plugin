@@ -148,9 +148,7 @@ class Module extends \Aurora\System\Module\AbstractModule
     {
         if (!empty($prefix) && $folder !== 'INBOX' && substr($folder, 0, strlen('INBOX' . self::$delimiter)) !== 'INBOX' . self::$delimiter) {
             if (!empty($folder)) {
-                if (!empty($prefix)) {
-                    $folder = $prefix . self::$delimiter . $folder;
-                }
+                $folder = $prefix . self::$delimiter . $folder;
             } else {
                 $folder = $prefix;
             }
@@ -280,15 +278,18 @@ class Module extends \Aurora\System\Module\AbstractModule
             if (isset($aArgs['AccountID'])) {
                 $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
             }
-            $massages = & $mResult->GetAsArray();
-            foreach ($massages as $message) {
-                $refMessage = new \ReflectionObject($message);
-                $folderProp = $refMessage->getProperty('sFolder');
-                $folderProp->setAccessible(true);
-                $newFolderName = $this->removePrefixFromFolderName($message->getFolder(), $prefix);
-                $folderProp->setValue($message, $newFolderName);
-            };
-            $mResult->FolderName = $this->removePrefixFromFolderName($mResult->FolderName, $prefix);
+            $prefix = trim($prefix);
+            if (!empty($prefix)) {
+                $massages = & $mResult->GetAsArray();
+                foreach ($massages as $message) {
+                    $refMessage = new \ReflectionObject($message);
+                    $folderProp = $refMessage->getProperty('sFolder');
+                    $folderProp->setAccessible(true);
+                    $newFolderName = $this->removePrefixFromFolderName($message->getFolder(), $prefix);
+                    $folderProp->setValue($message, $newFolderName);
+                };
+                $mResult->FolderName = $this->removePrefixFromFolderName($mResult->FolderName, $prefix);
+            }
         }
     }
 
@@ -306,9 +307,12 @@ class Module extends \Aurora\System\Module\AbstractModule
                     if (isset($aArgs['AccountID'])) {
                         $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
                     }
-                    $aValues['Folder'] = $this->removePrefixFromFolderName($aValues['Folder'], $prefix);
-                    $queryStringList[1] = \Aurora\System\Api::EncodeKeyValues($aValues);
-                    $_SERVER['QUERY_STRING'] = implode('/', $queryStringList);
+                    $prefix = trim($prefix);
+                    if (!empty($prefix)) {
+                        $aValues['Folder'] = $this->removePrefixFromFolderName($aValues['Folder'], $prefix);
+                        $queryStringList[1] = \Aurora\System\Api::EncodeKeyValues($aValues);
+                        $_SERVER['QUERY_STRING'] = implode('/', $queryStringList);
+                    }
                 }
             }
 
