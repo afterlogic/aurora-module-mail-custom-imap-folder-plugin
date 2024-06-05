@@ -99,7 +99,7 @@ class Module extends \Aurora\System\Module\AbstractModule
             $oImapFolderProp->setValue($oImapFolder, substr($oImapFolder->FullNameRaw(), strlen($prefix)));
 
             $renamedFolders[] = $folder;
-        } else {    
+        } else {
             $subfoldersColl = $folder->getSubFolders();
             if ($subfoldersColl !== null) {
                 $subfolders = & $subfoldersColl->GetAsArray();

@@ -10,7 +10,6 @@ namespace Aurora\Modules\MailCustomImapFolderPrefixPlugin;
 use Aurora\Modules\Mail\Models\MailAccount;
 use Aurora\Modules\Mail\Models\SystemFolder;
 
-
 /**
  * Manager for work with ImapClient.
  *
@@ -95,7 +94,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         );
     }
 
-        /**
+    /**
      * Obtains information about system folders from IMAP.
      * Sets system type for obtained folders, excludes information about them from $aFoldersMap.
      *
