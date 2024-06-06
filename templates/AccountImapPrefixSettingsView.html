@@ -3,7 +3,7 @@
 		<div> 
 			<div class="row">
 				<span class="label" data-bind="i18n: {'key': '%MODULENAME%/LABEL_PREFIX'}"></span>
-				<input class="input" data-bind="value: prefix" />
+				<input class="input" data-bind="value: prefix, css: {'disabled': isLoading() || isSaving()}, attr: {'disabled': isLoading() || isSaving()}" />
 			</div>
 			<div class="row hint">
 				<span data-bind="i18n: {'key': '%MODULENAME%/LABEL_HINT_PREFIX'}"></span>

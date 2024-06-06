@@ -27,6 +27,8 @@ function AccountImapPrefixSettingsView()
 	CAbstractSettingsFormView.call(this, '%ModuleName%')
 
 	this.prefix = ko.observable('')
+
+	this.isLoading = ko.observable(false)
 }
 
 _.extendOwn(AccountImapPrefixSettingsView.prototype, CAbstractSettingsFormView.prototype);
@@ -78,6 +80,7 @@ AccountImapPrefixSettingsView.prototype.onUpdateSettingsResponse = function (oRe
 	} else {
 		this.updateSavedState()
 		Screens.showReport(TextUtils.i18n('COREWEBCLIENT/REPORT_SETTINGS_UPDATE_SUCCESS'))
+		window.location.reload();
 	}
 }
 
@@ -86,6 +89,7 @@ AccountImapPrefixSettingsView.prototype.populate = function()
 	const oAccount = AccountList.getEdited()
 
 	if (oAccount) {
+		this.isLoading(true);
 		Ajax.send(Settings.ServerModuleName, 'GetAccountSettings', {'AccountId': oAccount.id()}, this.onGetSettingsResponse, this)
 	}
 	
@@ -98,6 +102,8 @@ AccountImapPrefixSettingsView.prototype.populate = function()
  */
 AccountImapPrefixSettingsView.prototype.onGetSettingsResponse = function (oResponse, oRequest)
 {
+	this.isLoading(false);
+
 	const oResult = oResponse && oResponse.Result
 
 	if (oResult) {
