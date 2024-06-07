@@ -85,18 +85,31 @@ class Module extends \Aurora\System\Module\AbstractModule
         return parent::Decorator();
     }
 
+    protected function setFolderFullNameRaw($folder, $prefix) {
+        $refFolder = new \ReflectionObject($folder);
+        $oImapFolderProp = $refFolder->getProperty('oImapFolder');
+        $oImapFolderProp->setAccessible(true);
+        $oImapFolder = $oImapFolderProp->getValue($folder);
+
+        $refImapFolder = new \ReflectionObject($oImapFolder);
+        $oImapFolderProp = $refImapFolder->getProperty('sFullNameRaw');
+        $oImapFolderProp->setAccessible(true);
+        $oImapFolderProp->setValue($oImapFolder, substr($oImapFolder->FullNameRaw(), strlen($prefix)));
+
+        return $folder;
+    }
+
     protected function renameSubfoldersRec($folder, $prefix, &$renamedFolders)
     {
         if (substr($folder->getFullName(), 0, strlen($prefix)) == $prefix) {
-            $refFolder = new \ReflectionObject($folder);
-            $oImapFolderProp = $refFolder->getProperty('oImapFolder');
-            $oImapFolderProp->setAccessible(true);
-            $oImapFolder = $oImapFolderProp->getValue($folder);
+            $folder = $this->setFolderFullNameRaw($folder, $prefix);
 
-            $refImapFolder = new \ReflectionObject($oImapFolder);
-            $oImapFolderProp = $refImapFolder->getProperty('sFullNameRaw');
-            $oImapFolderProp->setAccessible(true);
-            $oImapFolderProp->setValue($oImapFolder, substr($oImapFolder->FullNameRaw(), strlen($prefix)));
+            $subfoldersColl = $folder->getSubFolders();
+            if ($subfoldersColl !== null) {
+                $subfoldersColl->foreachWithSubFolders(function($subFolder) use ($prefix) {
+                    $this->setFolderFullNameRaw($subFolder, $prefix);
+                });
+            }
 
             $renamedFolders[] = $folder;
         } else {
