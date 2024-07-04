@@ -7,8 +7,9 @@
 
 namespace Aurora\Modules\MailCustomImapFolderPrefixPlugin;
 
+use Aurora\Modules\Mail\Classes\Folder;
 use Aurora\Modules\Mail\Models\MailAccount;
-use Aurora\Modules\Mail\Models\SystemFolder;
+use Aurora\Modules\Mail\Enums\FolderType;
 
 /**
  * Manager for work with ImapClient.
@@ -33,43 +34,12 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         return $prefix;
     }
 
-    /**
-     * Obtains information about system folders from database.
-     * Sets system type for existent folders, excludes information about them from $aFoldersMap.
-     * Deletes information from database for nonexistent folders.
-     *
-     * @param MailAccount $oAccount Account object.
-     * @param \Aurora\Modules\Mail\Classes\FolderCollection $oFolderCollection Collection of folders.
-     * @param array $aFoldersMap Describes information about system folders that weren't initialized yet.
-     */
-    private function _initSystemFoldersFromDb($oAccount, $oFolderCollection, &$aFoldersMap)
-    {
-        $aSystemFolderEntities = $this->_getSystemFolderEntities($oAccount);
-
-        foreach ($aSystemFolderEntities as $oSystemFolder) {
-            if ($oSystemFolder->FolderFullName === '') {
-                unset($aFoldersMap[$oSystemFolder->Type]);
-            } else {
-                $oFolder = $oFolderCollection->getFolder($oSystemFolder->FolderFullName, true);
-                if ($oFolder) {
-                    if (isset($aFoldersMap[$oSystemFolder->Type])) {
-                        if ($oSystemFolder->Type !== \Aurora\Modules\Mail\Enums\FolderType::Template) {
-                            unset($aFoldersMap[$oSystemFolder->Type]);
-                        }
-                        $oFolder->setType($oSystemFolder->Type);
-                    }
-                } elseif ($oFolderCollection->getCollectionFullFlag()) {
-                    $oSystemFolder->delete();
-                }
-            }
-        }
-    }
-
-    private function _getSystemFolderEntities($oAccount)
-    {
-        return SystemFolder::where(array(
-            'IdAccount' => $oAccount->Id
-        ))->limit(9)->get();
+    private function callPrivateMethod ($object, $method, ...$args) {
+        $call = function ($method, ...$args) {
+            return $this->$method(...$args);
+        };
+        $newCall = $call->bindTo($object, get_class($object));
+        return $newCall($method, ...$args);
     }
 
     /**
@@ -83,63 +53,16 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         $oFolderCollection->foreachOnlyRoot(
             function (/* @var $oFolder \Aurora\Modules\Mail\Classes\Folder */ $oFolder) use (&$aFoldersMap) {
                 foreach ($aFoldersMap as $iFolderType => $aFoldersNames) {
-                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) && (in_array($oFolder->getRawFullName(), $aFoldersNames) || in_array($oFolder->getRawFullName(), $aFoldersNames))) {
+                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) && 
+                        (in_array($oFolder->getRawFullName(), $aFoldersNames) || in_array($oFolder->getRawFullName(), $aFoldersNames))) {
                         unset($aFoldersMap[$iFolderType]);
-                        if (\Aurora\Modules\Mail\Enums\FolderType::Custom === $oFolder->getType()) {
+                        if (FolderType::Custom === $oFolder->getType()) {
                             $oFolder->setType($iFolderType);
                         }
                     }
                 }
             }
         );
-    }
-
-    /**
-     * Obtains information about system folders from IMAP.
-     * Sets system type for obtained folders, excludes information about them from $aFoldersMap.
-     *
-     * @param \Aurora\Modules\Mail\Classes\FolderCollection $oFolderCollection Collection of folders.
-     * @param array $aFoldersMap Describes information about system folders that weren't initialized yet.
-     */
-    private function _initSystemFoldersFromImapFlags($oFolderCollection, &$aFoldersMap)
-    {
-        $oFolderCollection->foreachWithSubFolders(
-            function (/* @var $oFolder \Aurora\Modules\Mail\Classes\Folder */ $oFolder) use (&$aFoldersMap) {
-                $iXListType = $oFolder->getFolderXListType();
-                if (isset($aFoldersMap[$iXListType]) && \Aurora\Modules\Mail\Enums\FolderType::Custom === $oFolder->getType() && isset($aFoldersMap[$iXListType])) {
-                    unset($aFoldersMap[$iXListType]);
-                    $oFolder->setType($iXListType);
-                }
-            }
-        );
-    }
-
-    /**
-     * Creates system folders that weren't initialized earlier because they don't exist.
-     *
-     * @param MailAccount $oAccount Account object.
-     * @param \Aurora\Modules\Mail\Classes\FolderCollection $oFolderCollection Collection of folders.
-     * @param array $aFoldersMap Describes information about system folders that weren't initialized yet.
-     */
-    private function _createNonexistentSystemFolders($oAccount, $oFolderCollection, $aFoldersMap)
-    {
-        $bSystemFolderIsCreated = false;
-
-        if (is_array($aFoldersMap)) {
-            $sNamespace = $oFolderCollection->getNamespace();
-            foreach ($aFoldersMap as $mFolderName) {
-                $sFolderFullName = is_array($mFolderName) &&
-                    isset($mFolderName[0]) && is_string($mFolderName[0]) && 0 < strlen($mFolderName[0]) ?
-                        $mFolderName[0] : (is_string($mFolderName) && 0 < strlen($mFolderName) ? $mFolderName : '');
-
-                if (0 < strlen($sFolderFullName)) {
-                    $this->createFolderByFullName($oAccount, $sNamespace . $sFolderFullName);
-                    $bSystemFolderIsCreated = true;
-                }
-            }
-        }
-
-        return $bSystemFolderIsCreated;
     }
 
     /**
@@ -161,19 +84,19 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
                 $prefix = trim($prefix) . Module::$delimiter;
             }
 
-            $aFoldersMap = array(
-                \Aurora\Modules\Mail\Enums\FolderType::Drafts => array($prefix . 'Drafts', $prefix . 'Draft'),
-                \Aurora\Modules\Mail\Enums\FolderType::Sent => array($prefix . 'Sent', $prefix . 'Sent Items', $prefix . 'Sent Mail'),
-                \Aurora\Modules\Mail\Enums\FolderType::Spam => array($prefix . 'Spam', $prefix . 'Junk', $prefix . 'Junk Mail', $prefix . 'Junk E-mail', $prefix . 'Bulk Mail'),
-                \Aurora\Modules\Mail\Enums\FolderType::Trash => array($prefix . 'Trash', $prefix . 'Bin', $prefix . 'Deleted', $prefix . 'Deleted Items'),
+            $aFoldersMap = [
+                FolderType::Drafts => [$prefix . 'Drafts', $prefix . 'Draft'],
+                FolderType::Sent => [$prefix . 'Sent', $prefix . 'Sent Items', $prefix . 'Sent Mail'],
+                FolderType::Spam => [$prefix . 'Spam', $prefix . 'Junk', $prefix . 'Junk Mail', $prefix . 'Junk E-mail', $prefix . 'Bulk Mail'],
+                FolderType::Trash => [$prefix . 'Trash', $prefix . 'Bin', $prefix . 'Deleted', $prefix . 'Deleted Items'],
                 // if array is empty, folder will not be set and/or created from folders map
-                \Aurora\Modules\Mail\Enums\FolderType::Template => array(),
-                \Aurora\Modules\Mail\Enums\FolderType::All => array(),
-            );
+                FolderType::Template => [],
+                FolderType::All => [],
+            ];
 
             $oInbox = $oFolderCollection->getFolder('INBOX');
             if ($oInbox) {
-                $oInbox->setType(\Aurora\Modules\Mail\Enums\FolderType::Inbox);
+                $oInbox->setType(FolderType::Inbox);
             }
 
             $prefix = $this->getPrefixForAccount($oAccount);
@@ -190,22 +113,72 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
                 $prefixSubfoldersCollection = $prefixFolder->getSubFolders();
             }
 
+            $mailManager = new \Aurora\Modules\Mail\Managers\Main\Manager($this->GetModule());
             // Tries to set system folders from database data.
-            $this->_initSystemFoldersFromDb($oAccount, $prefixSubfoldersCollection, $aFoldersMap);
+            $this->callPrivateMethod($mailManager, '_initSystemFoldersFromDb', $oAccount, $prefixSubfoldersCollection, $aFoldersMap);
 
             // Tries to set system folders from imap flags for those folders that weren't set from database data.
-            $this->_initSystemFoldersFromImapFlags($prefixSubfoldersCollection, $aFoldersMap);
+            $this->callPrivateMethod($mailManager, '_initSystemFoldersFromImapFlags', $prefixSubfoldersCollection, $aFoldersMap);
 
             // Tries to set system folders from folders map for those folders that weren't set from database data or IMAP flags.
             $this->_initSystemFoldersFromFoldersMap($prefixSubfoldersCollection, $aFoldersMap);
 
             if ($bCreateNonexistentSystemFolders) {
-                $bSystemFolderIsCreated = $this->_createNonexistentSystemFolders($oAccount, $prefixSubfoldersCollection, $aFoldersMap);
+                $bSystemFolderIsCreated = $this->callPrivateMethod($mailManager, '_createNonexistentSystemFolders', $oAccount, $prefixSubfoldersCollection, $aFoldersMap);
             }
         } catch (\Exception $oException) {
             $bSystemFolderIsCreated = false;
         }
 
         return $bSystemFolderIsCreated;
+    }
+
+    public function getFolders($oAccount, $bCreateUnExistenSystemFolders = true, $sParent = '')
+    {
+        if (empty($sParent)) {
+            $prefix = trim($oAccount->getExtendedProp('MailCustomImapFolderPrefixPlugin::Prefix', ''));
+            if (!empty($prefix)) {
+                $sParent = $prefix . Module::$delimiter;
+            }
+        }
+        $folderCollection = parent::getFolders($oAccount, $bCreateUnExistenSystemFolders, $sParent);
+        $folderCollection->addFolder(Folder::createInstance(\MailSo\Imap\Folder::NewInstance('INBOX', '/', [])));
+
+        return $folderCollection;
+    }
+
+        /**
+     * Obtains information about particular folders.
+     *
+     * @param MailAccount $oAccount Account object.
+     * @param array $aFolderFullNamesRaw Array containing a list of folder names to obtain information for.
+     * @param boolean $bUseListStatusIfPossible Indicates if LIST-STATUS command should be used if it's supported by IMAP server.
+     *
+     * @return array Array containing elements like those returned by **getFolderInformation** method.
+     */
+    public function getFolderListInformation($oAccount, $aFolderFullNamesRaw, $bUseListStatusIfPossible)
+    {
+        return parent::getFolderListInformation($oAccount, $aFolderFullNamesRaw, false);
+    }
+
+       /**
+     * Obtains folders order.
+     *
+     * @param MailAccount $oAccount Account object.
+     *
+     * @return array
+     */
+    public function getFoldersOrder($oAccount)
+    {
+        $aList = parent::getFoldersOrder($oAccount);
+
+        if (count($aList) > 0) {
+            $prefix = $this->getPrefixForAccount($oAccount);
+            $aList = array_map(function($folder) use ($prefix) {
+                return $prefix . $folder;
+            }, $aList);
+        }
+
+        return $aList;
     }
 }

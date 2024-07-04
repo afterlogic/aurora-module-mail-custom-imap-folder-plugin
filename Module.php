@@ -48,6 +48,8 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::SetMessagesSeen::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SetMessageFlagged::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SetAllMessagesSeen::before', [$this, 'prepareArguments']);
+        $this->subscribeEvent('Mail::SendMessage::before', [$this, 'prepareArguments']);
+        $this->subscribeEvent('Mail::SaveMessage::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::CopyMessages::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::MoveMessages::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::DeleteMessages::before', [$this, 'prepareArguments']);
@@ -65,8 +67,11 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::UpdateFoldersOrder::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SaveMessageAsTempFile::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::SetupSystemFolders::before', [$this, 'prepareArguments']);
+        $this->subscribeEvent('MailNotesPlugin::SaveNote::before', [$this, 'prepareArguments']);
 
         $this->subscribeEvent('System::RunEntry::before', [$this, 'onBeforeRunEntry']);
+
+        MailModule::getInstance()->setMailManager(new Manager($this));
     }
 
     /**
@@ -121,11 +126,6 @@ class Module extends \Aurora\System\Module\AbstractModule
                 }
             }
         }
-    }
-
-    public function onBeforeGetFolders($aArgs, &$mResult)
-    {
-        MailModule::getInstance()->setMailManager(new Manager($this));
     }
 
     public function onAfterGetFolders($aArgs, &$mResult)
@@ -245,14 +245,22 @@ class Module extends \Aurora\System\Module\AbstractModule
                 $aArgs['Spam'] = $this->addPrefixToFolderName($aArgs['Spam'], $prefix);
             }
 
+            if (isset($aArgs['DraftFolder'])) {
+                $aArgs['DraftFolder'] = $this->addPrefixToFolderName($aArgs['DraftFolder'], $prefix);
+            }
+
+            if (isset($aArgs['SentFolder'])) {
+                $aArgs['SentFolder'] = $this->addPrefixToFolderName($aArgs['SentFolder'], $prefix);
+            }
+
             if (isset($aArgs['Folders']) && is_array($aArgs['Folders'])) {
-                foreach ($aArgs['Folders'] as $val) {
+                foreach ($aArgs['Folders'] as &$val) {
                     $val = $this->addPrefixToFolderName($val, $prefix);
                 }
             }
 
             if (isset($aArgs['FolderList']) && is_array($aArgs['FolderList'])) {
-                foreach ($aArgs['FolderList'] as $val) {
+                foreach ($aArgs['FolderList'] as &$val) {
                     $val = $this->addPrefixToFolderName($val, $prefix);
                 }
             }
