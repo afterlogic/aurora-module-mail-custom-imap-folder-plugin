@@ -25,6 +25,8 @@ class Module extends \Aurora\System\Module\AbstractModule
 
     protected $aRequireModules = ['Mail'];
 
+    protected $isPreparedFolderArgument = false;
+
     /**
      * Initializes Mail Module.
      *
@@ -36,6 +38,7 @@ class Module extends \Aurora\System\Module\AbstractModule
         $this->subscribeEvent('Mail::GetFolders::before', [$this, 'onBeforeGetFolders']);
         $this->subscribeEvent('Mail::GetRelevantFoldersInformation::after', [$this, 'onAfterGetRelevantFoldersInformation']);
         $this->subscribeEvent('Mail::GetMessages::after', [$this, 'onAfterGetMessages']);
+        $this->subscribeEvent('Mail::GetMessage::after', [$this, 'onAfterGetMessage']);
 
         $this->subscribeEvent('Mail::GetMessages::before', [$this, 'prepareArguments']);
         $this->subscribeEvent('Mail::GetMessagesByFolders::before', [$this, 'prepareArguments']);
@@ -71,7 +74,7 @@ class Module extends \Aurora\System\Module\AbstractModule
 
         $this->subscribeEvent('System::RunEntry::before', [$this, 'onBeforeRunEntry']);
 
-        MailModule::getInstance()->setMailManager(new Manager($this));
+        MailModule::getInstance()->setMailManager(new Manager(Api::GetModule('Mail')));
     }
 
     /**
@@ -206,7 +209,10 @@ class Module extends \Aurora\System\Module\AbstractModule
 
         if (!empty($prefix)) {
             if (isset($aArgs['Folder'])) {
-                $aArgs['Folder'] = $this->addPrefixToFolderName($aArgs['Folder'], $prefix);
+                if (!$this->isPreparedFolderArgument) {
+                    $aArgs['Folder'] = $this->addPrefixToFolderName($aArgs['Folder'], $prefix);
+                    $this->isPreparedFolderArgument = true;
+                }
             }
 
             if (isset($aArgs['ToFolder'])) {
@@ -292,25 +298,35 @@ class Module extends \Aurora\System\Module\AbstractModule
         }
     }
 
+    protected function updateMessageFolder($accountId, $message) 
+    {
+        $prefix = trim($this->getPrefixForAccount($accountId));
+
+        if (!empty($prefix)) {
+            $refMessage = new \ReflectionObject($message);
+            $folderProp = $refMessage->getProperty('sFolder');
+            $folderProp->setAccessible(true);
+            $newFolderName = $this->removePrefixFromFolderName($message->getFolder(), $prefix);
+            $folderProp->setValue($message, $newFolderName);
+        }
+
+        return $message;
+    }
+
     public function onAfterGetMessages(&$aArgs, &$mResult)
     {
         if ($mResult) {
-            $prefix = '';
-            if (isset($aArgs['AccountID'])) {
-                $prefix = $this->getPrefixForAccount((int) $aArgs['AccountID']);
+            $massages = & $mResult->GetAsArray();
+            foreach ($massages as $message) {
+                $message = $this->updateMessageFolder((int) $aArgs['AccountID'], $message);
             }
-            $prefix = trim($prefix);
-            if (!empty($prefix)) {
-                $massages = & $mResult->GetAsArray();
-                foreach ($massages as $message) {
-                    $refMessage = new \ReflectionObject($message);
-                    $folderProp = $refMessage->getProperty('sFolder');
-                    $folderProp->setAccessible(true);
-                    $newFolderName = $this->removePrefixFromFolderName($message->getFolder(), $prefix);
-                    $folderProp->setValue($message, $newFolderName);
-                };
-                $mResult->FolderName = $this->removePrefixFromFolderName($mResult->FolderName, $prefix);
-            }
+        }
+    }
+
+    public function onAfterGetMessage(&$aArgs, &$mResult)
+    {
+        if ($mResult) {
+            $mResult = $this->updateMessageFolder((int) $aArgs['AccountID'], $mResult);
         }
     }
 
