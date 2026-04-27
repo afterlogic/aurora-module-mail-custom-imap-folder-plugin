@@ -34,7 +34,8 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         return $prefix;
     }
 
-    private function callPrivateMethod ($object, $method, ...$args) {
+    private function callPrivateMethod($object, $method, ...$args)
+    {
         $call = function ($method, ...$args) {
             return $this->$method(...$args);
         };
@@ -53,7 +54,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         $oFolderCollection->foreachOnlyRoot(
             function (/* @var $oFolder \Aurora\Modules\Mail\Classes\Folder */ $oFolder) use (&$aFoldersMap) {
                 foreach ($aFoldersMap as $iFolderType => $aFoldersNames) {
-                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) && 
+                    if (isset($aFoldersMap[$iFolderType]) && is_array($aFoldersNames) &&
                         (in_array($oFolder->getRawFullName(), $aFoldersNames) || in_array($oFolder->getRawFullName(), $aFoldersNames))) {
                         unset($aFoldersMap[$iFolderType]);
                         if (FolderType::Custom === $oFolder->getType()) {
@@ -147,7 +148,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         return $folderCollection;
     }
 
-        /**
+    /**
      * Obtains information about particular folders.
      *
      * @param MailAccount $oAccount Account object.
@@ -161,7 +162,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
         return parent::getFolderListInformation($oAccount, $aFolderFullNamesRaw, false);
     }
 
-       /**
+    /**
      * Obtains folders order.
      *
      * @param MailAccount $oAccount Account object.
@@ -174,7 +175,7 @@ class Manager extends \Aurora\Modules\Mail\Managers\Main\Manager
 
         if (count($aList) > 0) {
             $prefix = $this->getPrefixForAccount($oAccount);
-            $aList = array_map(function($folder) use ($prefix) {
+            $aList = array_map(function ($folder) use ($prefix) {
                 return $prefix . $folder;
             }, $aList);
         }

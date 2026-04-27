@@ -93,7 +93,8 @@ class Module extends \Aurora\System\Module\AbstractModule
         return parent::Decorator();
     }
 
-    protected function setFolderFullNameRaw($folder, $prefix) {
+    protected function setFolderFullNameRaw($folder, $prefix)
+    {
         $refFolder = new \ReflectionObject($folder);
         $oImapFolderProp = $refFolder->getProperty('oImapFolder');
         $oImapFolderProp->setAccessible(true);
@@ -114,7 +115,7 @@ class Module extends \Aurora\System\Module\AbstractModule
 
             $subfoldersColl = $folder->getSubFolders();
             if ($subfoldersColl !== null) {
-                $subfoldersColl->foreachWithSubFolders(function($subFolder) use ($prefix) {
+                $subfoldersColl->foreachWithSubFolders(function ($subFolder) use ($prefix) {
                     $this->setFolderFullNameRaw($subFolder, $prefix);
                 });
             }
@@ -123,7 +124,7 @@ class Module extends \Aurora\System\Module\AbstractModule
         } else {
             $subfoldersColl = $folder->getSubFolders();
             if ($subfoldersColl !== null) {
-                $subfolders = & $subfoldersColl->GetAsArray();
+                $subfolders = &$subfoldersColl->GetAsArray();
                 foreach ($subfolders as $subFolder) {
                     $this->renameSubfoldersRec($subFolder, $prefix, $renamedFolders);
                 }
@@ -140,7 +141,7 @@ class Module extends \Aurora\System\Module\AbstractModule
             }
 
             if (!empty(rtrim($prefix, self::$delimiter))) {
-                $folders = & $mResult['Folders']->GetAsArray();
+                $folders = &$mResult['Folders']->GetAsArray();
                 $renamedFolders = [];
                 foreach ($folders as $key => $folder) {
                     if ($folder->getType() !== FolderType::Inbox) {
@@ -298,7 +299,7 @@ class Module extends \Aurora\System\Module\AbstractModule
         }
     }
 
-    protected function updateMessageFolder($accountId, $message) 
+    protected function updateMessageFolder($accountId, $message)
     {
         $prefix = trim($this->getPrefixForAccount($accountId));
 
@@ -316,7 +317,7 @@ class Module extends \Aurora\System\Module\AbstractModule
     public function onAfterGetMessages(&$aArgs, &$mResult)
     {
         if ($mResult) {
-            $massages = & $mResult->GetAsArray();
+            $massages = &$mResult->GetAsArray();
             foreach ($massages as $message) {
                 $message = $this->updateMessageFolder((int) $aArgs['AccountID'], $message);
             }
