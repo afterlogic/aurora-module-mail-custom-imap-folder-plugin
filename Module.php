@@ -85,14 +85,6 @@ class Module extends \Aurora\System\Module\AbstractModule
         return parent::getInstance();
     }
 
-    /**
-     * @return Module
-     */
-    public static function Decorator()
-    {
-        return parent::Decorator();
-    }
-
     protected function setFolderFullNameRaw($folder, $prefix)
     {
         $refFolder = new \ReflectionObject($folder);
